@@ -35,6 +35,11 @@ let showDebug = false;
 // Game objects
 let paddle1 = null; // Left paddle (Player 1)
 let paddle2 = null; // Right paddle (Player 2)
+let ball = null;    // The ball
+
+// Score (will be expanded in Phase 5)
+let score1 = 0;
+let score2 = 0;
 
 /**
  * Clear the canvas with black background
@@ -59,6 +64,17 @@ function drawNet() {
 }
 
 /**
+ * Draw the score (temporary - will be expanded in Phase 5)
+ */
+function drawScore() {
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '48px Courier New';
+  ctx.textAlign = 'center';
+  ctx.fillText(score1, CANVAS_WIDTH / 4, 60);
+  ctx.fillText(score2, (CANVAS_WIDTH / 4) * 3, 60);
+}
+
+/**
  * Draw game state info (pause screen, etc.)
  */
 function drawStateInfo() {
@@ -80,6 +96,8 @@ function drawStateInfo() {
 function drawDebug() {
   if (!showDebug) return;
   
+  const ballInfo = ball.getDebugInfo();
+  
   ctx.fillStyle = '#00ff00';
   ctx.font = '12px Courier New';
   ctx.textAlign = 'left';
@@ -88,6 +106,8 @@ function drawDebug() {
   ctx.fillText(`Delta: ${deltaTime.toFixed(2)}ms`, 10, 50);
   ctx.fillText(`P1 Y: ${paddle1.y.toFixed(0)} V: ${paddle1.velocity.toFixed(2)}`, 10, 65);
   ctx.fillText(`P2 Y: ${paddle2.y.toFixed(0)} V: ${paddle2.velocity.toFixed(2)}`, 10, 80);
+  ctx.fillText(`Ball: (${ballInfo.x}, ${ballInfo.y}) V: (${ballInfo.vx}, ${ballInfo.vy})`, 10, 95);
+  ctx.fillText(`Ball Speed: ${ballInfo.speed}`, 10, 110);
 }
 
 /**
@@ -122,6 +142,21 @@ function handlePaddleInput() {
 }
 
 /**
+ * Handle scoring
+ * @param {string} scorer - 'left' or 'right'
+ */
+function handleScore(scorer) {
+  if (scorer === 'left') {
+    score1++;
+  } else {
+    score2++;
+  }
+  
+  // Reset ball after score
+  ball.reset();
+}
+
+/**
  * Update game logic
  * @param {number} dt - Delta time in milliseconds
  */
@@ -135,7 +170,11 @@ function update(dt) {
   paddle1.update(dt);
   paddle2.update(dt);
   
-  // Ball update will go here in Phase 4
+  // Update ball and check for scoring
+  const scored = ball.update(dt, paddle1, paddle2);
+  if (scored) {
+    handleScore(scored);
+  }
 }
 
 /**
@@ -144,12 +183,14 @@ function update(dt) {
 function render() {
   clearCanvas();
   drawNet();
+  drawScore();
   
   // Draw paddles
   paddle1.render(ctx);
   paddle2.render(ctx);
   
-  // Ball will be drawn here in Phase 4
+  // Draw ball
+  ball.render(ctx);
   
   drawStateInfo();
   drawControls();
@@ -199,6 +240,9 @@ function resetGame() {
   currentState = GameState.PAUSED;
   paddle1.reset();
   paddle2.reset();
+  ball.reset();
+  score1 = 0;
+  score2 = 0;
 }
 
 /**
@@ -237,6 +281,9 @@ function createGameObjects() {
     (CANVAS_HEIGHT - 100) / 2,
     'right'
   );
+  
+  // Ball
+  ball = new Ball();
 }
 
 /**
