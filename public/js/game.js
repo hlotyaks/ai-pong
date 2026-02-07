@@ -14,13 +14,15 @@ const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const TARGET_FPS = 60;
 const FRAME_TIME = 1000 / TARGET_FPS;
-const PADDLE_OFFSET = 30; // Distance from edge
+const PADDLE_OFFSET = 30;
+const WINNING_SCORE = 11;
 
 // Game state
 const GameState = {
   PLAYING: 'playing',
   PAUSED: 'paused',
-  GAME_OVER: 'game_over'
+  GAME_OVER: 'game_over',
+  SCORE_PAUSE: 'score_pause' // Brief pause after scoring
 };
 
 // Game variables
@@ -32,14 +34,16 @@ let frameCount = 0;
 let fpsUpdateTime = 0;
 let showDebug = false;
 
-// Game objects
-let paddle1 = null; // Left paddle (Player 1)
-let paddle2 = null; // Right paddle (Player 2)
-let ball = null;    // The ball
+// Score pause timing
+let scorePauseTimer = 0;
+const SCORE_PAUSE_DURATION = 1000; // 1 second pause after score
+let scoreFlashIntensity = 0;
 
-// Score (will be expanded in Phase 5)
-let score1 = 0;
-let score2 = 0;
+// Game objects
+let paddle1 = null;
+let paddle2 = null;
+let ball = null;
+let scoreManager = null;
 
 /**
  * Clear the canvas with black background
@@ -64,25 +68,13 @@ function drawNet() {
 }
 
 /**
- * Draw the score (temporary - will be expanded in Phase 5)
- */
-function drawScore() {
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '48px Courier New';
-  ctx.textAlign = 'center';
-  ctx.fillText(score1, CANVAS_WIDTH / 4, 60);
-  ctx.fillText(score2, (CANVAS_WIDTH / 4) * 3, 60);
-}
-
-/**
  * Draw game state info (pause screen, etc.)
  */
 function drawStateInfo() {
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '32px Courier New';
-  ctx.textAlign = 'center';
-  
   if (currentState === GameState.PAUSED) {
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '32px Courier New';
+    ctx.textAlign = 'center';
     ctx.fillText('PAUSED', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
     ctx.font = '16px Courier New';
     ctx.fillStyle = '#666666';
@@ -91,7 +83,7 @@ function drawStateInfo() {
 }
 
 /**
- * Draw debug info (FPS counter, etc.)
+ * Draw debug info
  */
 function drawDebug() {
   if (!showDebug) return;
@@ -108,6 +100,7 @@ function drawDebug() {
   ctx.fillText(`P2 Y: ${paddle2.y.toFixed(0)} V: ${paddle2.velocity.toFixed(2)}`, 10, 80);
   ctx.fillText(`Ball: (${ballInfo.x}, ${ballInfo.y}) V: (${ballInfo.vx}, ${ballInfo.vy})`, 10, 95);
   ctx.fillText(`Ball Speed: ${ballInfo.speed}`, 10, 110);
+  ctx.fillText(`Score: ${scoreManager.getScoreString()}`, 10, 125);
 }
 
 /**
@@ -117,28 +110,17 @@ function drawControls() {
   ctx.fillStyle = '#444444';
   ctx.font = '12px Courier New';
   ctx.textAlign = 'center';
-  ctx.fillText('P1: W/S | P2: ↑/↓ | SPACE: Pause | D: Debug', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 15);
+  ctx.fillText('P1: W/S | P2: ↑/↓ | SPACE: Pause | D: Debug | R: Restart', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 15);
 }
 
 /**
  * Handle paddle input
  */
 function handlePaddleInput() {
-  // Player 1 (Left paddle - W/S)
-  if (Input.isPlayer1Up()) {
-    paddle1.moveUp();
-  }
-  if (Input.isPlayer1Down()) {
-    paddle1.moveDown();
-  }
-  
-  // Player 2 (Right paddle - Arrow keys)
-  if (Input.isPlayer2Up()) {
-    paddle2.moveUp();
-  }
-  if (Input.isPlayer2Down()) {
-    paddle2.moveDown();
-  }
+  if (Input.isPlayer1Up()) paddle1.moveUp();
+  if (Input.isPlayer1Down()) paddle1.moveDown();
+  if (Input.isPlayer2Up()) paddle2.moveUp();
+  if (Input.isPlayer2Down()) paddle2.moveDown();
 }
 
 /**
@@ -146,13 +128,18 @@ function handlePaddleInput() {
  * @param {string} scorer - 'left' or 'right'
  */
 function handleScore(scorer) {
-  if (scorer === 'left') {
-    score1++;
+  const gameOver = scoreManager.addPoint(scorer);
+  
+  if (gameOver) {
+    currentState = GameState.GAME_OVER;
   } else {
-    score2++;
+    // Brief pause after scoring
+    currentState = GameState.SCORE_PAUSE;
+    scorePauseTimer = SCORE_PAUSE_DURATION;
+    scoreFlashIntensity = 1;
   }
   
-  // Reset ball after score
+  // Reset ball
   ball.reset();
 }
 
@@ -161,20 +148,35 @@ function handleScore(scorer) {
  * @param {number} dt - Delta time in milliseconds
  */
 function update(dt) {
+  // Handle score pause
+  if (currentState === GameState.SCORE_PAUSE) {
+    scorePauseTimer -= dt;
+    scoreFlashIntensity = Math.max(0, scorePauseTimer / SCORE_PAUSE_DURATION);
+    
+    if (scorePauseTimer <= 0) {
+      currentState = GameState.PLAYING;
+    }
+    
+    // Still update paddles during score pause
+    handlePaddleInput();
+    paddle1.update(dt);
+    paddle2.update(dt);
+    return;
+  }
+  
   if (currentState !== GameState.PLAYING) return;
   
-  // Handle input
   handlePaddleInput();
-  
-  // Update paddles
   paddle1.update(dt);
   paddle2.update(dt);
   
-  // Update ball and check for scoring
   const scored = ball.update(dt, paddle1, paddle2);
   if (scored) {
     handleScore(scored);
   }
+  
+  // Fade out flash
+  scoreFlashIntensity = Math.max(0, scoreFlashIntensity - dt / 500);
 }
 
 /**
@@ -182,31 +184,34 @@ function update(dt) {
  */
 function render() {
   clearCanvas();
-  drawNet();
-  drawScore();
   
-  // Draw paddles
+  // Score flash effect
+  scoreManager.renderScoreFlash(ctx, CANVAS_WIDTH, CANVAS_HEIGHT, scoreFlashIntensity);
+  
+  drawNet();
+  scoreManager.render(ctx, CANVAS_WIDTH);
+  
   paddle1.render(ctx);
   paddle2.render(ctx);
-  
-  // Draw ball
   ball.render(ctx);
   
   drawStateInfo();
   drawControls();
   drawDebug();
+  
+  // Game over overlay (on top of everything)
+  if (currentState === GameState.GAME_OVER) {
+    scoreManager.renderGameOver(ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
+  }
 }
 
 /**
- * Main game loop using requestAnimationFrame
- * @param {number} timestamp - Current timestamp from requestAnimationFrame
+ * Main game loop
  */
 function gameLoop(timestamp) {
-  // Calculate delta time
   deltaTime = timestamp - lastFrameTime;
   lastFrameTime = timestamp;
   
-  // Update FPS counter
   frameCount++;
   if (timestamp - fpsUpdateTime >= 1000) {
     fps = frameCount;
@@ -214,11 +219,9 @@ function gameLoop(timestamp) {
     fpsUpdateTime = timestamp;
   }
   
-  // Update and render
   update(deltaTime);
   render();
   
-  // Request next frame
   requestAnimationFrame(gameLoop);
 }
 
@@ -231,6 +234,7 @@ function togglePause() {
   } else if (currentState === GameState.PAUSED) {
     currentState = GameState.PLAYING;
   }
+  // Can't pause during game over or score pause
 }
 
 /**
@@ -241,13 +245,12 @@ function resetGame() {
   paddle1.reset();
   paddle2.reset();
   ball.reset();
-  score1 = 0;
-  score2 = 0;
+  scoreManager.reset();
+  scoreFlashIntensity = 0;
 }
 
 /**
  * Handle keyboard input
- * @param {KeyboardEvent} event
  */
 function handleKeyDown(event) {
   switch (event.code) {
@@ -268,22 +271,10 @@ function handleKeyDown(event) {
  * Create game objects
  */
 function createGameObjects() {
-  // Left paddle (Player 1)
-  paddle1 = new Paddle(
-    PADDLE_OFFSET,
-    (CANVAS_HEIGHT - 100) / 2,
-    'left'
-  );
-  
-  // Right paddle (Player 2)
-  paddle2 = new Paddle(
-    CANVAS_WIDTH - PADDLE_OFFSET - 15,
-    (CANVAS_HEIGHT - 100) / 2,
-    'right'
-  );
-  
-  // Ball
+  paddle1 = new Paddle(PADDLE_OFFSET, (CANVAS_HEIGHT - 100) / 2, 'left');
+  paddle2 = new Paddle(CANVAS_WIDTH - PADDLE_OFFSET - 15, (CANVAS_HEIGHT - 100) / 2, 'right');
   ball = new Ball();
+  scoreManager = new ScoreManager(WINNING_SCORE);
 }
 
 /**
@@ -291,24 +282,18 @@ function createGameObjects() {
  */
 function init() {
   console.log('🏓 AI Pong initialized');
+  console.log(`   First to ${WINNING_SCORE} wins!`);
   console.log('   Player 1: W/S keys');
   console.log('   Player 2: Arrow Up/Down');
   console.log('   Press SPACE to start');
   
-  // Initialize input handler
   Input.init();
-  
-  // Create game objects
   createGameObjects();
-  
-  // Set up event listeners
   document.addEventListener('keydown', handleKeyDown);
   
-  // Start the game loop
   lastFrameTime = performance.now();
   fpsUpdateTime = lastFrameTime;
   requestAnimationFrame(gameLoop);
 }
 
-// Start the game when DOM is loaded
 document.addEventListener('DOMContentLoaded', init);
