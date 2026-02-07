@@ -3,7 +3,7 @@
 **Created:** 2026-02-07  
 **Planning Model:** Claude Opus 4.5  
 **Developer:** Skippy the Magnificent  
-**Project Owner:** Elyanna (Stephen)
+**Project Owner:** Stephen
 
 ---
 
@@ -321,7 +321,7 @@ These are ideas for after the core game is complete:
 
 ## 📝 Next Steps
 
-1. **Review this plan with Elyanna**
+1. **Review this plan with Stephen**
    - Get approval on architecture
    - Confirm milestones make sense
    - Adjust if needed
