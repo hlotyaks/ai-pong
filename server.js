@@ -5,11 +5,18 @@
  * Created by: Skippy the Magnificent
  */
 
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 
-// Load environment variables (if .env exists)
-const PORT = process.env.PORT || 8888;
+// Load port from environment - REQUIRED (no hardcoded default)
+const PORT = process.env.PORT;
+
+if (!PORT) {
+  console.error('❌ ERROR: PORT environment variable is required.');
+  console.error('   Create a .env file with PORT=<your-port> or set it in your environment.');
+  process.exit(1);
+}
 
 const app = express();
 
