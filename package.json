@@ -1,0 +1,21 @@
+{
+  "name": "ai-pong",
+  "version": "1.0.0",
+  "description": "Classic Pong game built by Skippy the Magnificent",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "pong",
+    "game",
+    "canvas",
+    "ai"
+  ],
+  "author": "Skippy the Magnificent",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
