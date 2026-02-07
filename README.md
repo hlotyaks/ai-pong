@@ -65,7 +65,7 @@ No frameworks. No build tools. Just clean, simple code.
 
 ```
 ai-pong/
-├── public/
+├── docs/
 │   ├── css/
 │   │   └── style.css      # Retro styling
 │   ├── js/
