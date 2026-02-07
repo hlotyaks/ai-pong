@@ -14,6 +14,7 @@ const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const TARGET_FPS = 60;
 const FRAME_TIME = 1000 / TARGET_FPS;
+const PADDLE_OFFSET = 30; // Distance from edge
 
 // Game state
 const GameState = {
@@ -30,6 +31,10 @@ let fps = 0;
 let frameCount = 0;
 let fpsUpdateTime = 0;
 let showDebug = false;
+
+// Game objects
+let paddle1 = null; // Left paddle (Player 1)
+let paddle2 = null; // Right paddle (Player 2)
 
 /**
  * Clear the canvas with black background
@@ -81,6 +86,8 @@ function drawDebug() {
   ctx.fillText(`FPS: ${fps}`, 10, 20);
   ctx.fillText(`State: ${currentState}`, 10, 35);
   ctx.fillText(`Delta: ${deltaTime.toFixed(2)}ms`, 10, 50);
+  ctx.fillText(`P1 Y: ${paddle1.y.toFixed(0)} V: ${paddle1.velocity.toFixed(2)}`, 10, 65);
+  ctx.fillText(`P2 Y: ${paddle2.y.toFixed(0)} V: ${paddle2.velocity.toFixed(2)}`, 10, 80);
 }
 
 /**
@@ -90,7 +97,28 @@ function drawControls() {
   ctx.fillStyle = '#444444';
   ctx.font = '12px Courier New';
   ctx.textAlign = 'center';
-  ctx.fillText('SPACE: Pause | D: Debug | R: Restart', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 15);
+  ctx.fillText('P1: W/S | P2: ↑/↓ | SPACE: Pause | D: Debug', CANVAS_WIDTH / 2, CANVAS_HEIGHT - 15);
+}
+
+/**
+ * Handle paddle input
+ */
+function handlePaddleInput() {
+  // Player 1 (Left paddle - W/S)
+  if (Input.isPlayer1Up()) {
+    paddle1.moveUp();
+  }
+  if (Input.isPlayer1Down()) {
+    paddle1.moveDown();
+  }
+  
+  // Player 2 (Right paddle - Arrow keys)
+  if (Input.isPlayer2Up()) {
+    paddle2.moveUp();
+  }
+  if (Input.isPlayer2Down()) {
+    paddle2.moveDown();
+  }
 }
 
 /**
@@ -100,11 +128,14 @@ function drawControls() {
 function update(dt) {
   if (currentState !== GameState.PLAYING) return;
   
-  // Game logic will go here in future phases
-  // - Update paddle positions
-  // - Update ball position
-  // - Check collisions
-  // - Update score
+  // Handle input
+  handlePaddleInput();
+  
+  // Update paddles
+  paddle1.update(dt);
+  paddle2.update(dt);
+  
+  // Ball update will go here in Phase 4
 }
 
 /**
@@ -114,10 +145,11 @@ function render() {
   clearCanvas();
   drawNet();
   
-  // Game objects will be drawn here in future phases
-  // - Draw paddles
-  // - Draw ball
-  // - Draw score
+  // Draw paddles
+  paddle1.render(ctx);
+  paddle2.render(ctx);
+  
+  // Ball will be drawn here in Phase 4
   
   drawStateInfo();
   drawControls();
@@ -165,7 +197,8 @@ function togglePause() {
  */
 function resetGame() {
   currentState = GameState.PAUSED;
-  // Reset game objects will go here
+  paddle1.reset();
+  paddle2.reset();
 }
 
 /**
@@ -188,12 +221,38 @@ function handleKeyDown(event) {
 }
 
 /**
+ * Create game objects
+ */
+function createGameObjects() {
+  // Left paddle (Player 1)
+  paddle1 = new Paddle(
+    PADDLE_OFFSET,
+    (CANVAS_HEIGHT - 100) / 2,
+    'left'
+  );
+  
+  // Right paddle (Player 2)
+  paddle2 = new Paddle(
+    CANVAS_WIDTH - PADDLE_OFFSET - 15,
+    (CANVAS_HEIGHT - 100) / 2,
+    'right'
+  );
+}
+
+/**
  * Initialize the game
  */
 function init() {
   console.log('🏓 AI Pong initialized');
+  console.log('   Player 1: W/S keys');
+  console.log('   Player 2: Arrow Up/Down');
   console.log('   Press SPACE to start');
-  console.log('   Press D for debug info');
+  
+  // Initialize input handler
+  Input.init();
+  
+  // Create game objects
+  createGameObjects();
   
   // Set up event listeners
   document.addEventListener('keydown', handleKeyDown);
